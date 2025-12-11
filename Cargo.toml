@@ -1,0 +1,11 @@
+[package]
+name = "weighted-atom-sweep"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies.pathmap]
+# TODO: use git and pin to a version
+# git = "https://github.com/Adam-Vandervorst/PathMap.git"
+# branch = "master"
+path = "../PathMap"
+features = ["zipper_tracking", "arena_compact"]
