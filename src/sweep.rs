@@ -1,7 +1,7 @@
 use crate::map::WeightedMap;
 use crate::operation::{Operation, OperationObserver};
 use crate::traversal::TransversalEngine;
-use pathmap::PathMap;
+// use pathmap::PathMap;
 use pathmap::zipper::{ZipperCreation, ZipperHeadOwned};
 use std::sync::{Arc, mpsc};
 
@@ -39,14 +39,12 @@ where
     O: KernelOperation<H>,
     H: AtomHeader,
 {
-    pub fn new(traversal: T, operations: Vec<O>, settings: WeightedAtomSweepSettings) -> Self {
+    pub fn new(traversal: T, operations: Vec<O>, settings: WeightedAtomSweepSettings, map: WeightedMap<H>) -> Self {
         Self {
             traversal: Arc::new(traversal),
             operations: operations,
             settings,
-            map: WeightedMap {
-                inner: Arc::new(PathMap::<H>::new().into_zipper_head([])),
-            },
+            map
         }
     }
 
