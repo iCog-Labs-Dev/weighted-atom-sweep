@@ -7,7 +7,9 @@ use std::sync::{Arc, mpsc};
 
 pub type AtomPosition = Vec<u8>;
 
-pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static {}
+pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static + Default {
+    fn add(&self, other: &Self) -> Self; 
+}
 pub trait KernelOperation<H: AtomHeader>:
     Operation<H> + Send + Sync + Clone + std::fmt::Debug + PartialEq + 'static
 {
@@ -20,11 +22,27 @@ pub trait SweepTransversalEngine<H: AtomHeader>:
 
 pub struct WeightedAtomSweepSettings {}
 
+#[derive(Clone, Debug, Default)]
+pub struct WeightedValue<H: AtomHeader> {
+    pub val: H,
+    pub child_agg_w: H
+}
+
+impl <H: AtomHeader> AtomHeader for WeightedValue<H> {
+
+    fn add(&self, other: &Self) -> Self {
+        WeightedValue {
+            val: self.val.clone(),
+            child_agg_w: self.child_agg_w.add(&other.val),
+        }
+    }
+}
+
 pub struct WeightedAtomSweep<T, O, H>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
     H: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<H>>,
+    O: KernelOperation<WeightedValue<H>>,
 {
     // pub reciever: mpsc::Receiver<T::Atom>,
     pub traversal: Arc<T>,
@@ -35,9 +53,9 @@ where
 
 impl<T, O, H> WeightedAtomSweep<T, O, H>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
     H: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<H>>,
+    O: KernelOperation<WeightedValue<H>>,
 {
     pub fn new(traversal: T, operations: Vec<O>, settings: WeightedAtomSweepSettings, map: WeightedMap<H>) -> Self {
         Self {
@@ -49,7 +67,7 @@ where
     }
 
     // TODO: map can be limited to a subset of the map
-    pub fn spawn(self) -> Arc<ZipperHeadOwned<H>> {
+    pub fn spawn(self) -> Arc<ZipperHeadOwned<WeightedValue<H>>> {
         let (atom_sender, atom_reciever) = mpsc::channel::<AtomPosition>();
         let engine = self.traversal.clone();
         let sender = atom_sender.clone();
@@ -58,7 +76,10 @@ where
         // spawn traversal thread
         std::thread::spawn(move || {
             // get access to a read zipper
-            let traverse_zp = self.map.read_zipper_at_borrowed_path(&[]).unwrap();
+            let traverse_zp = match self.map.read_zipper_at_borrowed_path(&[]) {
+                Ok(zipper) => zipper,
+                Err(_) => return,
+            };
 
             let atom_path = engine.next_atom(traverse_zp).unwrap();
             sender.send(atom_path).unwrap();
@@ -79,11 +100,11 @@ where
     }
 }
 
-impl<T, O, H> OperationObserver<H, O> for WeightedAtomSweep<T, O, H>
+impl<T, O, V> OperationObserver<WeightedValue<V>, O> for WeightedAtomSweep<T, O, V>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
-    H: AtomHeader,
+    V: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<V>>,
+    O: KernelOperation<WeightedValue<V>>,
 {
     fn subscribe(&mut self, operation: O) {
         self.operations.push(operation);
