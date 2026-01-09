@@ -23,6 +23,7 @@ impl<H: AtomHeader + Default> WeightedMap<H> {
         }
     }
 
+
     pub fn set_val(&self, path: &[u8], val: WeightedValue<H>) -> () {
 
         match self.inner.write_zipper_at_exclusive_path(path) {
@@ -39,18 +40,22 @@ impl<H: AtomHeader + Default> WeightedMap<H> {
     pub fn set_weighted_val(&self, path: &[u8], val: H) -> Result<(), &'static str> {
         let current_weighted = self.get_val(path).unwrap_or(WeightedValue::default());
 
-        // Update the leaf value
+       // Update the leaf value
         self.set_val(path, WeightedValue { 
             val: val.clone(),
             child_agg_w: current_weighted.child_agg_w.clone()
         });
 
         // Propagate weight changes up to root
-        self.propagate(path, val)
+        if current_weighted.val < val {
+            self.propagate(path, val.subtract(&current_weighted.val))
+        } else {
+            self.propagate(path, current_weighted.val.subtract(&val))
+        }
         
     }
 
-    fn propagate(&self, path: &[u8], new_val:H) -> Result<(), &'static str>
+    fn propagate(&self, path: &[u8], delta:H) -> Result<(), &'static str>
     {
         if path.is_empty() {
             return Ok(()); // At root, noting to propagate
@@ -67,12 +72,12 @@ impl<H: AtomHeader + Default> WeightedMap<H> {
             if let Some(parent_weighted) = read_zipper.val() {
                 read_zipper.set_val( WeightedValue {
                     val: parent_weighted.val.clone(),
-                    child_agg_w: parent_weighted.child_agg_w.add(&new_val),
+                    child_agg_w: parent_weighted.child_agg_w.add(&delta.clone()),
                 });
             } else {
                 read_zipper.set_val( WeightedValue {
                     val: H::default(),
-                    child_agg_w: new_val.clone(),
+                    child_agg_w: delta.clone(),
                 });
             }
         }
