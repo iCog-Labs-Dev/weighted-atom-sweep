@@ -1,6 +1,6 @@
 use weighted_atom_sweep::{AtomHeader, WeightedValue, WeightedMap};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct SimpleWeight {
     value: f64,
 }
@@ -8,6 +8,10 @@ pub struct SimpleWeight {
 impl AtomHeader for SimpleWeight {
     fn add(&self, other: &Self) -> Self {
         SimpleWeight { value: self.value + other.value }
+    }
+
+    fn subtract(&self, other: &Self) -> Self {
+        Self { value: self.value - other.value }
     }
 }
 
