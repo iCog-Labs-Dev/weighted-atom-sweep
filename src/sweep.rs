@@ -7,8 +7,9 @@ use std::sync::{Arc, mpsc};
 
 pub type AtomPosition = Vec<u8>;
 
-pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static + Default {
+pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static + Default + PartialOrd {
     fn add(&self, other: &Self) -> Self; 
+    fn subtract(&self, other: &Self) -> Self; 
 }
 pub trait KernelOperation<H: AtomHeader>:
     Operation<H> + Send + Sync + Clone + std::fmt::Debug + PartialEq + 'static
@@ -22,7 +23,7 @@ pub trait SweepTransversalEngine<H: AtomHeader>:
 
 pub struct WeightedAtomSweepSettings {}
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct WeightedValue<H: AtomHeader> {
     pub val: H,
     pub child_agg_w: H
@@ -34,6 +35,13 @@ impl <H: AtomHeader> AtomHeader for WeightedValue<H> {
         WeightedValue {
             val: self.val.clone(),
             child_agg_w: self.child_agg_w.add(&other.val),
+        }
+    }
+
+    fn subtract(&self, other: &Self) -> Self {
+        Self {
+            val: self.val.clone(),
+            child_agg_w: self.child_agg_w.subtract(&other.val)
         }
     }
 }
