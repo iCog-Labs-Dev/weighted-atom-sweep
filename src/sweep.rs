@@ -1,14 +1,17 @@
 use crate::map::WeightedMap;
 use crate::operation::{Operation, OperationObserver};
 use crate::traversal::TransversalEngine;
-use pathmap::PathMap;
+// use pathmap::PathMap;
 use pathmap::zipper::{ZipperCreation, ZipperHeadOwned};
 use std::sync::{Arc, mpsc};
 use tracing::{debug, trace, instrument, span, Level};
 
 pub type AtomPosition = Vec<u8>;
 
-pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static {}
+pub trait AtomHeader: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static + Default + PartialOrd {
+    fn add(&self, other: &Self) -> Self; 
+    fn subtract(&self, other: &Self) -> Self; 
+}
 pub trait KernelOperation<H: AtomHeader>:
     Operation<H> + Send + Sync + Clone + std::fmt::Debug + PartialEq + 'static
 {
@@ -21,11 +24,34 @@ pub trait SweepTransversalEngine<H: AtomHeader>:
 
 pub struct WeightedAtomSweepSettings {}
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct WeightedValue<H: AtomHeader> {
+    pub val: H,
+    pub child_agg_w: H
+}
+
+impl <H: AtomHeader> AtomHeader for WeightedValue<H> {
+
+    fn add(&self, other: &Self) -> Self {
+        WeightedValue {
+            val: self.val.clone(),
+            child_agg_w: self.child_agg_w.add(&other.val),
+        }
+    }
+
+    fn subtract(&self, other: &Self) -> Self {
+        Self {
+            val: self.val.clone(),
+            child_agg_w: self.child_agg_w.subtract(&other.val)
+        }
+    }
+}
+
 pub struct WeightedAtomSweep<T, O, H>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
     H: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<H>>,
+    O: KernelOperation<WeightedValue<H>>,
 {
     // pub reciever: mpsc::Receiver<T::Atom>,
     pub traversal: Arc<T>,
@@ -36,12 +62,12 @@ where
 
 impl<T, O, H> WeightedAtomSweep<T, O, H>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
     H: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<H>>,
+    O: KernelOperation<WeightedValue<H>>,
 {
     #[instrument(skip_all, name = "sweep.new")]
-    pub fn new(traversal: T, operations: Vec<O>, settings: WeightedAtomSweepSettings) -> Self {
+    pub fn new(traversal: T, operations: Vec<O>, settings: WeightedAtomSweepSettings, map: WeightedMap<H>) -> Self {
         let operation_count = operations.len();
         debug!(operation_count, "initializing WeightedAtomSweep");
         trace!("creating new PathMap and initializing WeightedMap");
@@ -50,10 +76,8 @@ where
             traversal: Arc::new(traversal),
             operations: operations,
             settings,
-            map: WeightedMap {
-                inner: Arc::new(PathMap::<H>::new().into_zipper_head([])),
-            },
-        };
+            map
+            };
 
         debug!("WeightedAtomSweep initialization complete");
         result
@@ -61,7 +85,7 @@ where
 
     // TODO: map can be limited to a subset of the map
     #[instrument(skip_all, name = "sweep.spawn")]
-    pub fn spawn(self) -> Arc<ZipperHeadOwned<H>> {
+    pub fn spawn(self) -> Arc<ZipperHeadOwned<WeightedValue<H>>> {
         debug!("spawning WeightedAtomSweep threads");
 
         let (atom_sender, atom_reciever) = mpsc::channel::<AtomPosition>();
@@ -137,11 +161,11 @@ where
     }
 }
 
-impl<T, O, H> OperationObserver<H, O> for WeightedAtomSweep<T, O, H>
+impl<T, O, V> OperationObserver<WeightedValue<V>, O> for WeightedAtomSweep<T, O, V>
 where
-    T: SweepTransversalEngine<H>,
-    O: KernelOperation<H>,
-    H: AtomHeader,
+    V: AtomHeader,
+    T: SweepTransversalEngine<WeightedValue<V>>,
+    O: KernelOperation<WeightedValue<V>>,
 {
     #[instrument(skip_all, name = "sweep.subscribe", fields(op_name = operation.name()))]
     fn subscribe(&mut self, operation: O) {
