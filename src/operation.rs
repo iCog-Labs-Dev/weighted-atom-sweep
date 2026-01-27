@@ -27,30 +27,15 @@ use crate::sweep::{AtomHeader, AtomPosition};
 /// }
 /// ```
 pub trait Operation<H: AtomHeader> {
-    /// Get the name of this operation for logging and identification.
     fn name(&self) -> &str;
-
-    /// Transform the given atom position.
-    ///
-    /// Implementers should use `#[instrument]` and emit appropriate tracing logs.
     fn transform(&self, zipper: Arc<AtomPosition>) -> ();
 }
 
-/// Observer pattern trait for managing operation subscriptions.
-///
-/// Implementations emit debug-level traces for subscription state changes.
 pub trait OperationObserver<H, O>
 where
     H: AtomHeader,
     O: Operation<H>,
 {
-    /// Subscribe an operation to be executed.
-    ///
-    /// Emits debug-level traces about the subscription.
     fn subscribe(&mut self, observer: O);
-
-    /// Unsubscribe an operation from execution.
-    ///
-    /// Emits debug-level traces about the unsubscription and how many operations remain.
     fn unsubscribe(&mut self, observer: O);
 }
