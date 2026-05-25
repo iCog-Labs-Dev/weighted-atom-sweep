@@ -346,11 +346,13 @@ where
                             "processing atom from buffer"
                         );
 
-                        // Acquire a write zipper at the atom's position.
-                        // This gives exclusive write access to the subtrie at
-                        // and below atom_path. The zipper's root IS atom_path,
-                        // so ascend() returns false at this boundary.
-                        match map_for_operations.write_zipper_at_exclusive_path(&atom_path[..]) {
+                        // Acquire a write zipper at the trie root, not at the
+                        // atom_path. Operations receive the atom_path as metadata
+                        // and can descend to the visited atom or navigate freely
+                        // to read/write global data (e.g. flip tables, clause
+                        // weights). Operations that need the old scoped behavior
+                        // should begin with wz.descend_to(atom_path[..]).
+                        match map_for_operations.write_zipper_at_exclusive_path(&[]) {
                             Ok(mut wz) => {
                                 for (idx, op) in operations.iter().enumerate() {
                                     let op_span = span!(
