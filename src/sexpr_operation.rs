@@ -399,6 +399,8 @@ impl<H: AtomHeader> SExprOperation<H> {
                 }
                 wz.ascend_byte();
             }
+            mork_expr::Tag::LongArity | mork_expr::Tag::LongVarRef => { }
+
         }
     }
 
@@ -548,6 +550,8 @@ impl<H: AtomHeader> SExprOperation<H> {
                 }
                 wz.ascend_byte();
             }
+            mork_expr::Tag::LongArity | mork_expr::Tag::LongVarRef => { }
+
         }
     }
 
@@ -701,6 +705,8 @@ impl<H: AtomHeader> SExprOperation<H> {
                 }
                 wz.ascend_byte();
             }
+            mork_expr::Tag::LongArity | mork_expr::Tag::LongVarRef => { }
+
         }
     }
 
@@ -850,6 +856,8 @@ fn expr_item_size(data: &[u8], offset: usize) -> usize {
             }
             size
         }
+        mork_expr::Tag::LongArity | mork_expr::Tag::LongVarRef => { 0 }
+
     }
 }
 
